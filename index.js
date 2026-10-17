@@ -8,7 +8,7 @@ app.listen(process.env.PORT || 3000, () => { console.log('Web server đã sẵn 
 // === ĐIỀN THÔNG TIN SERVER VÀ TÀI KHOẢN CỦA BẠN VÀO ĐÂY ===
 const config = {
   host: 'kingmc.vn',     // Thay bằng IP server King Legacy bạn chơi
-  username: 'bbao',  // Đặt tên nick cho tài khoản Bot
+  username: 'ipttdup',  // Đặt tên nick cho tài khoản Bot
   version: '1.20.1',            // Sửa đúng phiên bản Minecraft của Server
   matkhau: 'Sam270311'   // Mật khẩu để bot tự động gõ /login
 };
