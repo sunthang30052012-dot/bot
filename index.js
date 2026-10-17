@@ -51,8 +51,7 @@ function startBot() {
     if (farmInterval) clearInterval(farmInterval);
     farmInterval = setInterval(() => {
       if (bot.entity) {
-        bot.swingHand(); // Tự động vung tay chém liên tục để farm
-      }
+        bot.swingHand('arm'); // Lệnh chuẩn xác để bot vung tay chém quái      }
     }, 1000); // 1 giây chém 1 lần
   });
 
