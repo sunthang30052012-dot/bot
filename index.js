@@ -4,7 +4,7 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-const interface = require('./interface'); // Nối liên kết với file interface.js ở trên
+const interface = require('./interface'); // Kết nối đồng bộ với file interface.js
 
 app.use(express.json());
 
@@ -22,7 +22,7 @@ let botStatus = "Chưa kết nối";
 let currentXYZ = "X: 0 | Y: 0 | Z: 0";
 let isRandomMoving = false;
 
-// Gọi trang web từ file interface.js
+// Gọi trang web giao diện liền khối từ file thứ nhất
 app.get('/', (req, res) => {
   res.send(interface.getHtmlPage(config, botStatus, currentXYZ));
 });
