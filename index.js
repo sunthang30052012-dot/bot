@@ -1,11 +1,11 @@
-// File: index.js - Bot + Web Server
+// File: index.js (Bản dùng radar ký tự ngay trên web, không cần prismarine-viewer)
 const mineflayer = require('mineflayer');
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const ui = require('./interface');
-const { renderView, renderRadar } = require('./screens');
+const { renderRadar } = require('./radar');
 
 app.use(express.json());
 
@@ -19,7 +19,7 @@ let bot = null;
 let farmInterval = null;
 let randomMoveInterval = null;
 let xyzInterval = null;
-let screenInterval = null;
+let radarInterval = null;
 let botStatus = "Chưa kết nối";
 let currentXYZ = "X: 0 | Y: 0 | Z: 0";
 let isRandomMoving = false;
@@ -40,7 +40,7 @@ function clearBotIntervals() {
   clearInterval(farmInterval);
   clearInterval(randomMoveInterval);
   clearInterval(xyzInterval);
-  clearInterval(screenInterval);
+  clearInterval(radarInterval);
 }
 
 function connectBot() {
@@ -70,14 +70,13 @@ function connectBot() {
       }
     }, 1000);
 
-    screenInterval = setInterval(() => {
+    radarInterval = setInterval(() => {
       try {
-        io.emit('viewUpdate', renderView(bot));
         io.emit('radarUpdate', renderRadar(bot));
       } catch (e) {
-        io.emit('viewUpdate', 'Lỗi màn hình: ' + e.message);
+        io.emit('radarUpdate', 'Lỗi radar: ' + e.message);
       }
-    }, 1200);
+    }, 1000);
 
     farmInterval = setInterval(() => {
       if (bot && bot.entity) {
@@ -98,7 +97,6 @@ function connectBot() {
     bot = null;
     isRandomMoving = false;
     clearBotIntervals();
-    io.emit('viewUpdate', 'Bot chưa bật hoặc chưa vào game...');
     io.emit('radarUpdate', 'Bot chưa bật hoặc chưa vào game...');
   });
 }
