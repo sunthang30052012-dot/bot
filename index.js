@@ -3,11 +3,11 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
 const app = express();
- 
+
 app.disable('x-powered-by');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
- 
+
 // === THÔNG TIN TÀI KHOẢN BOT ===
 // [SỬA] Mật khẩu không còn nằm trong code: đặt biến môi trường MC_PASSWORD trên nơi chạy bot.
 const config = {
@@ -16,7 +16,7 @@ const config = {
   version: '1.20.1',
   matkhau: process.env.MC_PASSWORD || ''
 };
- 
+
 // [SỬA] Tài khoản đăng nhập vào bảng điều khiển web (đặt PANEL_USER / PANEL_PASS)
 const PANEL_USER = process.env.PANEL_USER || 'admin';
 const PANEL_PASS = process.env.PANEL_PASS || crypto.randomBytes(6).toString('hex');
@@ -26,29 +26,29 @@ if (!process.env.PANEL_PASS) {
 if (!config.matkhau) {
   console.log('[!] Chưa đặt MC_PASSWORD nên bot sẽ KHÔNG tự gõ /dn.');
 }
- 
+
 // [SỬA] Chỉ đánh quái trong tầm ~3 block (tầm đánh bình thường của người chơi, xa hơn dễ bị anti-cheat bắt)
 const TAM_DANH = 3;
- 
+
 let bot;
 let farmInterval;
 let currentBotStatus = "Đang khởi động...";
 let lastLogs = [];
- 
+
 // [SỬA] Escape HTML để log / tin nhắn không chèn được mã vào trang web
 function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 }
- 
+
 // So sánh chuỗi an toàn (chống dò mật khẩu qua thời gian phản hồi)
 function safeEqual(a, b) {
   const ha = crypto.createHash('sha256').update(String(a)).digest();
   const hb = crypto.createHash('sha256').update(String(b)).digest();
   return crypto.timingSafeEqual(ha, hb);
 }
- 
+
 // [SỬA] Lấy tên hiển thị của item dưới dạng chữ thường (bỏ JSON / mã màu §) để tìm theo tên
 function chuTen(it) {
   let n = it && it.customName;
@@ -60,7 +60,7 @@ function chuTen(it) {
   } catch (e) { /* không phải JSON thì giữ nguyên */ }
   return n.replace(/§./g, '').trim();
 }
- 
+
 // Hàm lưu log để hiển thị lên giao diện web
 function logToWeb(msg) {
   // [SỬA] Hiện giờ Việt Nam (máy chủ host thường chạy giờ UTC)
@@ -70,10 +70,10 @@ function logToWeb(msg) {
   lastLogs.unshift(fullMsg);
   if (lastLogs.length > 40) lastLogs.pop();
 }
- 
+
 // [SỬA] /ping để công khai (cho UptimeRobot giữ app luôn thức); mọi đường dẫn khác phải đăng nhập
 app.get('/ping', (req, res) => res.send('ok'));
- 
+
 app.use((req, res, next) => {
   const [scheme, encoded] = (req.headers.authorization || '').split(' ');
   if (scheme === 'Basic' && encoded) {
@@ -86,14 +86,14 @@ app.use((req, res, next) => {
   res.set('WWW-Authenticate', 'Basic realm="Bot Minecraft"');
   res.status(401).send('Cần đăng nhập để vào bảng điều khiển.');
 });
- 
+
 // 🌐 THIẾT KẾ GIAO DIỆN WEB NÚT BẤM (HTML)
 app.get('/', (req, res) => {
   const logHtml = lastLogs.map(l => `<div>${esc(l)}</div>`).join('');
   const posHtml = (bot && bot.entity && bot.entity.position)
     ? `X: ${Math.round(bot.entity.position.x)} | Y: ${Math.round(bot.entity.position.y)} | Z: ${Math.round(bot.entity.position.z)}`
     : "Chưa cập nhật";
- 
+
   res.send(`
     <!DOCTYPE html>
     <html>
@@ -121,24 +121,24 @@ app.get('/', (req, res) => {
           <strong>Trạng thái:</strong> ${esc(currentBotStatus)}<br>
           <strong>Tọa độ thực:</strong> <span style="color:#ffeb3b">${posHtml}</span>
         </div>
- 
+
         <h3>⚡ HÀNH ĐỘNG NHANH ⚡</h3>
         <form action="/action" method="POST" style="display:inline;"><button class="btn btn-orange" name="cmd" value="menu">1. Mở Menu Đồng Hồ</button></form>
         <form action="/action" method="POST" style="display:inline;"><button class="btn" name="cmd" value="click35">2. Click Vào KingSMP</button></form>
         <form action="/action" method="POST" style="display:inline;"><button class="btn btn-blue" name="cmd" value="tpa">3. Đồng Ý Dịch Chuyển (/tpaccept)</button></form>
         <form action="/action" method="POST" style="display:inline;"><button class="btn btn-orange" name="cmd" value="jump">4. Nhảy Lên Tại Chỗ</button></form>
- 
+
         <form action="/click-slot" method="POST">
           <input type="text" name="slot" placeholder="Click ô số... (vd 35)" required>
           <button class="btn btn-orange" style="width:auto; padding: 10px 15px; margin:0 0 0 5px;">Click</button>
         </form>
- 
+
         <h3>💬 GỬI LỆNH CHAT / LỆNH GAME</h3>
         <form action="/custom-chat" method="POST">
           <input type="text" name="text" placeholder="Ví dụ: /smp hoặc /home..." required>
           <button class="btn btn-blue" style="width:auto; padding: 10px 15px; margin:0 0 0 5px;">Gửi</button>
         </form>
- 
+
         <h3>📜 LỊCH SỬ HOẠT ĐỘNG (LOGS)</h3>
         <div class="log-box">${logHtml}</div>
         <button class="btn btn-blue" onclick="location.reload()" style="width:auto; padding: 5px 15px; font-size:12px; margin-top:10px;">F5 Tải Lại Trang</button>
@@ -147,14 +147,14 @@ app.get('/', (req, res) => {
     </html>
   `);
 });
- 
+
 // 🛠️ XỬ LÝ SỰ KIỆN KHI BẤM NÚT TRÊN WEB
 app.post('/action', async (req, res) => {
   const action = req.body.cmd;
   if (!bot || !bot.entity) {
     return res.send("<script>alert('Bot chưa vào game, hãy đợi xíu!'); window.location.href='/';</script>");
   }
- 
+
   if (action === 'menu') {
     bot.setQuickBarSlot(4);
     setTimeout(() => {
@@ -191,10 +191,10 @@ app.post('/action', async (req, res) => {
     setTimeout(() => bot.setControlState('jump', false), 500);
     logToWeb("Nút bấm Web: Đã ra lệnh bot nhảy.");
   }
- 
+
   res.redirect('/');
 });
- 
+
 // [SỬA] Click ô bất kỳ trong menu đang mở (để thử khi chưa biết KingSMP ở ô nào)
 app.post('/click-slot', async (req, res) => {
   const slot = parseInt(req.body.slot, 10);
@@ -213,7 +213,7 @@ app.post('/click-slot', async (req, res) => {
   }
   res.redirect('/');
 });
- 
+
 // XỬ LÝ GỬI Ô CHAT TÙY Ý TỪ WEB
 app.post('/custom-chat', (req, res) => {
   const text = String(req.body.text || '').trim().slice(0, 256); // [SỬA] chat Minecraft tối đa 256 ký tự
@@ -225,9 +225,9 @@ app.post('/custom-chat', (req, res) => {
   }
   res.redirect('/');
 });
- 
+
 app.listen(process.env.PORT || 3000, () => { console.log('Web server da sẵn sàng.'); });
- 
+
 // 🤖 KHỞI TẠO MINEFLAYER BOT
 function startBot() {
   bot = mineflayer.createBot({
@@ -235,17 +235,17 @@ function startBot() {
     username: config.username,
     version: config.version
   });
- 
+
   let daGuiDangNhap = false; // [SỬA] mỗi lần kết nối chỉ gõ /dn một lần
- 
+
   bot.on('login', () => {
     currentBotStatus = "Đã kết nối, đang ở sảnh chờ.";
     logToWeb(`Bot ${bot.username} đã vào mạng thành công.`);
   });
- 
+
   bot.on('spawn', () => {
     logToWeb('Bot đã xuất hiện tại thế giới.');
- 
+
     // Tự động đăng nhập sảnh chờ
     // [SỬA] 'spawn' chạy lại mỗi lần đổi world / chuyển server (vd sang KingSMP) nên cần cờ để không gửi /dn lại
     if (!daGuiDangNhap && config.matkhau) {
@@ -255,7 +255,7 @@ function startBot() {
         logToWeb('Đã tự động gửi lệnh /dn mở khóa.');
       }, 2000);
     }
- 
+
     // Chế độ siêu farm tự động chém quái đứng cạnh
     if (farmInterval) clearInterval(farmInterval);
     farmInterval = setInterval(async () => {
@@ -274,7 +274,7 @@ function startBot() {
       } catch (err) { /* quái biến mất giữa chừng, bỏ qua */ }
     }, 1000);
   });
- 
+
   bot.on('windowOpen', (window) => {
     logToWeb('Menu Đồng hồ sảnh chờ đã mở ra trên màn hình ảo.');
     // [SỬA] Liệt kê item trong menu để biết KingSMP nằm ở ô nào
@@ -286,7 +286,7 @@ function startBot() {
     }
     logToWeb(`Các ô trong menu: ${ds.join(' | ') || '(trống)'}`);
   });
- 
+
   // [SỬA] Sự kiện 'chat' chỉ bắt tin nhắn của người chơi; thông báo từ plugin
   //       (kiểu "X muốn dịch chuyển đến bạn") là tin hệ thống nên phải dùng 'messagestr'.
   bot.on('messagestr', (msg) => {
@@ -294,22 +294,21 @@ function startBot() {
       logToWeb(`Server: ${msg.slice(0, 150)}`);
     }
   });
- 
+
   // [SỬA] Xem lý do bị kick (sự kiện 'end' thường không cho biết lý do này)
   bot.on('kicked', (reason) => {
     const text = typeof reason === 'string' ? reason : JSON.stringify(reason);
     logToWeb(`Bị kick: ${text.slice(0, 200)}`);
   });
- 
+
   bot.on('end', (reason) => {
     currentBotStatus = "Mất kết nối! Đang tự vào lại...";
     logToWeb(`Mất kết nối do: ${reason}. Đang thử lại sau 30 giây...`);
     clearInterval(farmInterval);
     setTimeout(startBot, 30000);
   });
- 
+
   bot.on('error', (err) => { logToWeb(`LỖI HỆ THỐNG: ${err.message}`); });
 }
- 
+
 startBot();
- 
