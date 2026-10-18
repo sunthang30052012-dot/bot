@@ -1,10 +1,10 @@
-// File: index.js (Bản Full Panel + Khung Chat ổn định không lỗi Đám mây)
+// File: index.js (Chứa logic xử lý Bot & Quét block lập ma trận ký tự)
 const mineflayer = require('mineflayer');
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-const interface = require('./interface'); // Kết nối đồng bộ với file interface.js
+const interface = require('./interface'); 
 
 app.use(express.json());
 
@@ -18,11 +18,11 @@ const config = {
 let bot = null;
 let farmInterval = null;
 let randomMoveInterval = null;
+let radarInterval = null;
 let botStatus = "Chưa kết nối";
 let currentXYZ = "X: 0 | Y: 0 | Z: 0";
 let isRandomMoving = false;
 
-// Gọi trang giao diện điều khiển chính từ file interface.js
 app.get('/', (req, res) => {
   res.send(interface.getHtmlPage(config, botStatus, currentXYZ));
 });
@@ -60,6 +60,48 @@ function connectBot() {
       }
     }, 1000);
 
+    // 👁️ CƠ CHẾ QUÉT MÔ PHỎNG BLOCK XUNG QUANH (MẮT THẦN KÝ TỰ)
+    if (radarInterval) clearInterval(radarInterval);
+    radarInterval = setInterval(() => {
+      if (!bot || !bot.entity) return;
+      
+      const p = bot.entity.position;
+      let viewText = " GÓC NHÌN BẢN ĐỒ ẢO 5x5 (Bot nằm ở tâm [🤖])\n";
+      viewText += "=========================================\n";
+      
+      // Quét ma trận 5x5 block xung quanh vị trí ngang chân bot (Y)
+      for (let zOffset = -2; zOffset <= 2; zOffset++) {
+        let rowText = "";
+        for (let xOffset = -2; xOffset <= 2; xOffset++) {
+          if (xOffset === 0 && zOffset === 0) {
+            rowText += "[🤖]"; // Tâm ma trận chính là vị trí của con Bot
+            continue;
+          }
+          
+          const blockPos = p.offset(xOffset, 0, zOffset);
+          const block = bot.blockAt(blockPos);
+          
+          // Định dạng các ký tự hiển thị tùy theo loại block
+          if (!block || block.name === 'air') {
+            rowText += "[  ]"; // Ô trống / Không khí
+          } else if (block.name.includes('glass')) {
+            rowText += "[🔲]"; // Kính giống y hệt chuồng kính trong ảnh của bạn!
+          } else if (block.name.includes('chest')) {
+            rowText += "[📦]"; // Rương đồ
+          } else if (block.name.includes('sand') || block.name.includes('dirt')) {
+            rowText += "[🧱]"; // Đất hoặc Cát dưới chân
+          } else {
+            rowText += "[■]"; // Các khối block đặc khác (Đá, Gỗ...)
+          }
+        }
+        viewText += rowText + "\n";
+      }
+      viewText += "=========================================\n";
+      viewText += "Ký hiệu: [🔲]:Kính | [📦]:Rương | [🧱]:Đất/Cát | [  ]:Trống";
+      
+      io.emit('radarUpdate', viewText); // Đẩy dữ liệu bức tranh ký tự ra ngoài trang web
+    }, 1000); // Cứ mỗi 1 giây tự động quét vẽ lại bản đồ block 1 lần
+
     if (farmInterval) clearInterval(farmInterval);
     farmInterval = setInterval(() => {
       if (bot && bot.entity) {
@@ -82,6 +124,7 @@ function connectBot() {
     isRandomMoving = false;
     clearInterval(farmInterval);
     clearInterval(randomMoveInterval);
+    clearInterval(radarInterval);
   });
 }
 
@@ -135,5 +178,4 @@ app.post('/api/click-kingsmp', (req, res) => {
   res.sendStatus(200);
 });
 
-// Chạy ứng dụng trên cổng do Render cấp duy nhất
 http.listen(process.env.PORT || 3000, () => { console.log('Web server san sang.'); });
