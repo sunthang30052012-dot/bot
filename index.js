@@ -30,13 +30,13 @@ function startBot() {
   bot.on('spawn', () => {
     console.log('[INFO] Bot da xuat hien tai sanh.');
     
-    // Tự động gõ lệnh đăng nhập /dn
+    // 1. Tự động gõ lệnh đăng nhập /dn sau khi vào sảnh 2 giây
     setTimeout(() => {
       bot.chat(`/dn ${config.matkhau}`);
       console.log('[AUTH] Da tu dong go /dn.');
     }, 2000);
 
-    // Cầm đồng hồ ở ô số 5 và bấm chuột phải để mở Menu
+    // 2. VƯỢT SẢNH CHỜ: Cầm đồng hồ ở ô số 5 (Hotbar slot 4) và click phải mở Menu
     setTimeout(() => {
       console.log('[LOBBY] Dang chuan bi mo Menu bang Dong ho...');
       bot.setQuickBarSlot(4); 
@@ -46,29 +46,36 @@ function startBot() {
       }, 1500);
     }, 5000);
 
-    // Chế độ siêu farm tự động vung tay chém liên tục
+    // 3. CHẾ ĐỘ SIÊU FARM: Tự động quét và tấn công mục tiêu đứng sát cạnh bot
     if (farmInterval) clearInterval(farmInterval);
     farmInterval = setInterval(() => {
       if (bot.entity) {
-        bot.swingHand('arm'); 
+        // Quét tìm quái vật (mob) hoặc người chơi khác ở gần trong phạm vi chém
+        const target = bot.nearestEntity((entity) => entity.type === 'mob' || entity.type === 'player');
+        if (target) {
+          bot.attack(target); // Tiến hành chém farm mục tiêu
+        }
       }
-    }, 1000); 
+    }, 1000); // Tần suất quét chém: 1 giây / 1 lần
   });
 
-  // Tự động click vào cụm KingSMP khi menu đồng hồ mở ra
+  // 4. TỰ ĐỘNG CLICK CHỌN CỤM KINGSMP KHI MENU MỞ RA
   bot.on('windowOpen', async (window) => {
     console.log('[MENU] Da mo Menu Dong ho thanh cong.');
+    
+    // Tìm ô có chứa tên "King" (KingSMP) để click dịch chuyển vào thế giới farm
     const item = window.slots.find(slot => slot && slot.displayName && slot.displayName.includes('King'));
     
     if (item) {
       console.log(`[LOBBY] Dang click chon cum: ${item.displayName}`);
       await bot.clickWindow(item.slot, 0, 0); 
     } else {
-      console.log('[LOBBY] Tu dong chon o mac dinh trong Menu...');
+      console.log('[LOBBY] Khong tim thay ten, tu dong chon o mac dinh so 4 trong Menu...');
       await bot.clickWindow(4, 0, 0); 
     }
   });
 
+  // 5. CƠ CHẾ TỰ ĐỘNG VÀO LẠI GAME KHI SERVER SẬP HOẶC BẢO TRÌ
   bot.on('end', (reason) => {
     console.log(`[RECONNECT] Mat ket noi: ${reason}. Vao lai sau 30s...`);
     clearInterval(farmInterval);
