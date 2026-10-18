@@ -14,7 +14,7 @@ const config = {
 
 let bot;
 let farmInterval;
-let daVaoCumChinh = false; // Biến khóa bảo vệ chống lặp lại
+let daVaoCumChinh = false;
 
 function startBot() {
   bot = mineflayer.createBot({
@@ -61,42 +61,25 @@ function startBot() {
     }, 1000); 
   });
 
-  // 4. BỘ DÒ Ô THÔNG MINH: Tự quét tên vật phẩm chứa chữ "King" để click
+  // 4. XỬ LÝ MENU: Ép buộc click chính xác vào Slot 35 (Khối vàng KingSMP theo ảnh)
   bot.on('windowOpen', (window) => {
-    if (daVaoCumChinh) return; // Đã vào cụm chính rồi thì không bấm lại nữa
-    console.log('[MENU] Da mo Menu Dong ho. Dang quet tim cum KingSMP...');
+    if (daVaoCumChinh) return;
+    console.log('[MENU] Da mo Menu Dong ho thanh cong. Dang doi tai du lieu...');
 
+    // Đợi 2 giây cho Menu tải xong thông tin ổn định rồi mới click
     setTimeout(async () => {
-      // Quét tìm tất cả các ô để xem ô nào có tên chứa chữ "king" hoặc "smp"
-      let foundSlot = null;
-      for (const slot of window.slots) {
-        if (slot && slot.displayName) {
-          const name = slot.displayName.toLowerCase();
-          if (name.includes('king') || name.includes('smp')) {
-            foundSlot = slot.slot;
-            console.log(`[LOBBY] Da do thay cum tai o so (Slot ID): ${slot.slot} - Ten: ${slot.displayName}`);
-            break;
-          }
-        }
-      }
-
-      // Thực hiện lệnh click ảo dựa trên kết quả dò được
       try {
-        if (foundSlot !== null) {
-          daVaoCumChinh = true; // Khóa lệnh để tránh lặp
-          await bot.clickWindow(foundSlot, 0, 0); // Click chuột trái vào ô chuẩn
-          console.log('[LOBBY] Da click o do tim duoc. Dang chuyen server...');
-        } else {
-          // Nếu hệ thống ẩn tên, ép buộc click thử ô trung tâm số 13 hoặc ô số 4
-          console.log('[LOBBY] Khong do duoc ten, click thu o mac dinh trung tam...');
-          daVaoCumChinh = true;
-          await bot.clickWindow(4, 0, 0); 
-        }
+        console.log('[LOBBY] Ep buoc click chuot trai vao o so 36 (Slot ID 35) de vao KingSMP...');
+        daVaoCumChinh = true; // Khóa lệnh để tránh lặp lại
+        
+        // Thực hiện lệnh click ảo chính xác vào ô khối vàng KingSMP dựa theo ảnh chụp
+        await bot.clickWindow(35, 0, 0); 
+        console.log('[LOBBY] Da gui lenh click chuot trai vào o KingSMP thanh cong!');
       } catch (err) {
         console.log(`[LOBBY] Loi click Menu: ${err.message}`);
-        daVaoCumChinh = false; // Reset nếu click lỗi để bot thử lại
+        daVaoCumChinh = false;
       }
-    }, 2000); // Trễ 2 giây chờ thực đơn load xong văn bản màu của vật phẩm
+    }, 2000);
   });
 
   bot.on('end', (reason) => {
