@@ -16,7 +16,6 @@ const config = {
 let bot;
 let farmInterval;
 let xyzInterval;
-let daVaoCumChinh = false;
 
 function startBot() {
   bot = mineflayer.createBot({
@@ -27,11 +26,10 @@ function startBot() {
 
   bot.on('login', () => { 
     console.log(`[OK] Bot ${bot.username} da vao mang.`); 
-    daVaoCumChinh = false; 
   });
 
   bot.on('spawn', () => {
-    console.log('[INFO] Bot da xuat hien.');
+    console.log('[INFO] Bot da xuat hien tai sanh cho.');
     
     // 1. Tự động gõ lệnh đăng nhập /dn sau khi vào sảnh 2 giây
     setTimeout(() => {
@@ -39,24 +37,31 @@ function startBot() {
       console.log('[AUTH] Da tu dong go /dn.');
     }, 2000);
 
-    // 2. MỞ MENU: Đợi 8 giây cho đăng nhập hoàn tất mới cầm đồng hồ mở thực đơn
-    setTimeout(() => {
-      if (!daVaoCumChinh) {
-        console.log('[LOBBY] Dang chuan bi mo Menu bang Dong ho...');
-        bot.setQuickBarSlot(4); // Cầm đồng hồ ở ô số 5 (Hotbar slot 4)
+    // 2. CƠ CHẾ ĐÂM CỔNG CHUYỂN CỤM: Đợi 5 giây đăng nhập xong, tự xoay góc chuẩn nhìn thẳng và chạy
+    setTimeout(async () => {
+      console.log('[LOBBY] Dang quay mat huong thang va chay vao Cong dich chuyen...');
+      try {
+        // Nhìn thẳng về phía trước góc 0 độ để hướng vào tâm cổng dịch chuyển
+        await bot.look(0, 0, true); 
+        
+        // Nhấn giữ phím đi thẳng (W) trong vòng 5 giây để đi xuyên qua cổng
+        bot.setControlState('forward', true);
         
         setTimeout(() => {
-          bot.activateItem(); // Bấm chuột phải mở thực đơn chọn cụm
-        }, 1500);
+          bot.setControlState('forward', false); // Thả phím ra
+          console.log('[LOBBY] Da ket thuc chuoi chay bo.');
+        }, 5000);
+      } catch (err) {
+        console.log(`[LOBBY] Loi cu dong: ${err.message}`);
       }
-    }, 8000);
+    }, 5000);
 
-    // 3. TỰ ĐỘNG CHECK XYZ IN LOGS RENDER (Cứ 5 giây/lần)
+    // 3. TỰ ĐỘNG CHECK XYZ IN LOGS RENDER (Cứ 5 giây / 1 lần)
     if (xyzInterval) clearInterval(xyzInterval);
     xyzInterval = setInterval(() => {
       if (bot.entity && bot.entity.position) {
         const pos = bot.entity.position;
-        console.log(`[CHECK XYZ] X: ${Math.round(pos.x)} | Y: ${Math.round(pos.y)} | Z: ${Math.round(pos.z)}`);
+        console.log(`[CHECK XYZ] Vi tri: X: ${Math.round(pos.x)} | Y: ${Math.round(pos.y)} | Z: ${Math.round(pos.z)}`);
       }
     }, 5000);
 
@@ -66,37 +71,18 @@ function startBot() {
       if (bot.entity) {
         const target = bot.nearestEntity((entity) => entity.type === 'mob');
         if (target) {
-          bot.attack(target); // Tự động vung tay chém quái rơi ở máy farm
+          bot.attack(target); 
         }
       }
     }, 1000); 
   });
 
-  // 5. XỬ LÝ MENU: Ép buộc click chính xác vào Slot 35 để vào KingSMP
-  bot.on('windowOpen', (window) => {
-    if (daVaoCumChinh) return;
-    console.log('[MENU] Da mo Menu Dong ho thanh cong. Dang doi tai du lieu...');
-
-    setTimeout(async () => {
-      try {
-        console.log('[LOBBY] Ep buoc click chuot trai vao o so 36 (Slot ID 35) de vao KingSMP...');
-        daVaoCumChinh = true; 
-        await bot.clickWindow(35, 0, 0); 
-        console.log('[LOBBY] Da gui lenh click chuot trai vao o KingSMP thanh cong!');
-      } catch (err) {
-        console.log(`[LOBBY] Loi click Menu: ${err.message}`);
-        daVaoCumChinh = false;
-      }
-    }, 2000);
-  });
-
-  // 6. TÍNH NĂNG ĐẶC BIỆT: TỰ ĐỘNG CHẤP NHẬN DỊCH CHUYỂN (/tpaccept)
-  // Bất kỳ ai gửi lệnh dịch chuyển tới, bot sẽ tự gõ /tpaccept sau 2 giây
+  // 5. TỰ ĐỘNG ĐỒNG Ý LỆNH DỊCH CHUYỂN (/tpaccept) KHI BẠN GỌI Ở CỤM CHÍNH
   bot.on('chat', (username, message) => {
-    if (message.includes('muốn dịch chuyển') || message.includes('tpa') || message.includes('tpahere')) {
+    if (message.includes('muon dich chuyen') || message.includes('tpa') || message.includes('tpahere')) {
       setTimeout(() => {
         bot.chat('/tpaccept');
-        console.log(`[TELEPORT] Da tu dong chap nhan lenh dich chuyen tu: ${username}`);
+        console.log(`[TELEPORT] Da tu dong nhan lenh /tpaccept tu: ${username}`);
       }, 2000);
     }
   });
