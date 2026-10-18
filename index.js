@@ -1,4 +1,4 @@
-const mineflayer = require('mineflayer');
+]const mineflayer = require('mineflayer');
 const express = require('express');
 const app = express();
 
@@ -36,7 +36,7 @@ function startBot() {
       console.log('[AUTH] Da tu dong go /dn.');
     }, 2000);
 
-    // 2. VƯỢT SẢNH CHỜ: Cầm đồng hồ ở ô số 5 (Hotbar slot 4) và click phải mở Menu
+    // 2. VƯỢT SẢN CHỜ: Cầm đồng hồ ở ô số 5 (Hotbar slot 4) và click phải mở Menu
     setTimeout(() => {
       console.log('[LOBBY] Dang chuan bi mo Menu bang Dong ho...');
       bot.setQuickBarSlot(4); 
@@ -59,20 +59,20 @@ function startBot() {
     }, 1000); // Tần suất quét chém: 1 giây / 1 lần
   });
 
-  // 4. TỰ ĐỘNG CLICK CHỌN CỤM KINGSMP KHI MENU MỞ RA
-  bot.on('windowOpen', async (window) => {
-    console.log('[MENU] Da mo Menu Dong ho thanh cong.');
+  // 4. TỰ ĐỘNG CLICK CHỌN CỤM KINGSMP KHI MENU MỞ RA (Đã sửa lỗi kẹt lặp vô hạn)
+  bot.on('windowOpen', (window) => {
+    console.log('[MENU] Da mo Menu Dong ho thanh cong. Dang doi tai du lieu...');
     
-    // Tìm ô có chứa tên "King" (KingSMP) để click dịch chuyển vào thế giới farm
-    const item = window.slots.find(slot => slot && slot.displayName && slot.displayName.includes('King'));
-    
-    if (item) {
-      console.log(`[LOBBY] Dang click chon cum: ${item.displayName}`);
-      await bot.clickWindow(item.slot, 0, 0); 
-    } else {
-      console.log('[LOBBY] Khong tim thay ten, tu dong chon o mac dinh so 4 trong Menu...');
-      await bot.clickWindow(4, 0, 0); 
-    }
+    // Đợi 1.5 giây sau khi mở menu rồi mới bấm chuột để server chấp nhận lệnh dịch chuyển
+    setTimeout(async () => {
+      try {
+        console.log('[LOBBY] Tien hanh click vao o so 5 (Slot 4) de vao KingSMP...');
+        await bot.clickWindow(4, 0, 0); // Bấm chuột trái trực tiếp vào khối đất KingSMP
+        console.log('[LOBBY] Da gui lenh click chuot thanh cong!');
+      } catch (err) {
+        console.log(`[LOBBY] Loi khi click Menu: ${err.message}`);
+      }
+    }, 1500);
   });
 
   // 5. CƠ CHẾ TỰ ĐỘNG VÀO LẠI GAME KHI SERVER SẬP HOẶC BẢO TRÌ
