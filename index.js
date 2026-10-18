@@ -2,10 +2,10 @@ const mineflayer = require('mineflayer');
 const express = require('express');
 const app = express();
 
-app.get('/', (req, res) => { res.send('Bot KingMC đang hoạt động!'); });
-app.listen(process.env.PORT || 3000, () => { console.log('Web server đã sẵn sàng.'); });
+app.get('/', (req, res) => { res.send('Bot KingMC dang hoat dong!'); });
+app.listen(process.env.PORT || 3000, () => { console.log('Web server da san sang.'); });
 
-// === ĐIỀN THÔNG TIN SERVER VÀ TÀI KHOẢN CỦA BẠN ===
+// === THÔNG TIN TÀI KHOẢN BOT ===
 const config = {
   host: 'kingmc.vn',
   username: 'ipttdup',
@@ -24,61 +24,58 @@ function startBot() {
   });
 
   bot.on('login', () => { 
-    console.log(`[OK] Bot ${bot.username} đã vào mạng.`); 
+    console.log(`[OK] Bot ${bot.username} da vao mang.`); 
   });
 
-  // Tự động xử lý đăng nhập và vượt sảnh chờ khi hồi sinh
   bot.on('spawn', () => {
-    console.log('[INFO] Bot đã xuất hiện tại sảnh.');
+    console.log('[INFO] Bot da xuat hien tai sanh.');
     
-    // 1. Tự động gõ lệnh đăng nhập /dn ngay khi vào
+    // Tự động gõ lệnh đăng nhập /dn
     setTimeout(() => {
       bot.chat(`/dn ${config.matkhau}`);
-      console.log('[AUTH] Đã tự động gõ /dn.');
+      console.log('[AUTH] Da tu dong go /dn.');
     }, 2000);
 
-    // 2. VƯỢT SẢN CHỜ: Cầm đồng hồ ở ô số 5 và bấm chuột phải để mở Menu
+    // Cầm đồng hồ ở ô số 5 và bấm chuột phải để mở Menu
     setTimeout(() => {
-      console.log('[LOBBY] Đang chuẩn bị mở Menu bằng Đồng hồ...');
-      bot.setQuickBarSlot(4); // Cầm vật phẩm ở ô thứ 5 trên thanh công cụ (Hotbar slot 4)
+      console.log('[LOBBY] Dang chuan bi mo Menu bang Dong ho...');
+      bot.setQuickBarSlot(4); 
       
       setTimeout(() => {
-        bot.activateItem(); // Bấm chuột phải để kích hoạt mở Menu Đồng hồ
+        bot.activateItem(); 
       }, 1500);
     }, 5000);
 
-    // 3. KÍCH HOẠT CHẾ ĐỘ SIÊU FARM (Chỉ chạy sau khi đã vào được thế giới chính)
+    // Chế độ siêu farm tự động vung tay chém liên tục
     if (farmInterval) clearInterval(farmInterval);
     farmInterval = setInterval(() => {
       if (bot.entity) {
-        bot.swingHand('arm'); // Lệnh chuẩn xác để bot vung tay chém quái      }
-    }, 1000); // 1 giây chém 1 lần
+        bot.swingHand('arm'); 
+      }
+    }, 1000); 
   });
 
-  // 4. TỰ ĐỘNG CLICK VÀO KHỐI ĐẤT/CỎ KHI MENU ĐỒNG HỒ MỞ RA
+  // Tự động click vào cụm KingSMP khi menu đồng hồ mở ra
   bot.on('windowOpen', async (window) => {
-    console.log('[MENU] Đã mở Menu Đồng hồ thành công.');
-    
-    // Tìm ô có chứa chữ "KingSMP" để bấm chọn vào cụm server chính
+    console.log('[MENU] Da mo Menu Dong ho thanh cong.');
     const item = window.slots.find(slot => slot && slot.displayName && slot.displayName.includes('King'));
     
     if (item) {
-      console.log(`[LOBBY] Đang click chọn cụm: ${item.displayName}`);
-      await bot.clickWindow(item.slot, 0, 0); // Click chuột trái vào ô đó
+      console.log(`[LOBBY] Dang click chon cum: ${item.displayName}`);
+      await bot.clickWindow(item.slot, 0, 0); 
     } else {
-      // Nếu không tìm thấy tên chính xác, tự động click vào ô số 4 (dòng đầu, cột thứ 5)
-      console.log('[LOBBY] Tự động chọn ô mặc định trong Menu...');
+      console.log('[LOBBY] Tu dong chon o mac dinh trong Menu...');
       await bot.clickWindow(4, 0, 0); 
     }
   });
 
   bot.on('end', (reason) => {
-    console.log(`[RECONNECT] Mất kết nối: ${reason}. Vào lại sau 30s...`);
+    console.log(`[RECONNECT] Mat ket noi: ${reason}. Vao lai sau 30s...`);
     clearInterval(farmInterval);
     setTimeout(startBot, 30000);
   });
   
-  bot.on('error', (err) => { console.log(`[LỖI] ${err.message}`); });
+  bot.on('error', (err) => { console.log(`[LOI] ${err.message}`); });
 }
 
 startBot();
