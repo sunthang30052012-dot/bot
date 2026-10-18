@@ -16,6 +16,7 @@ const config = {
 let bot;
 let farmInterval;
 let xyzInterval;
+let daVaoCumChinh = false;
 
 function startBot() {
   bot = mineflayer.createBot({
@@ -26,37 +27,19 @@ function startBot() {
 
   bot.on('login', () => { 
     console.log(`[OK] Bot ${bot.username} da vao mang.`); 
+    daVaoCumChinh = false; 
   });
 
   bot.on('spawn', () => {
-    console.log('[INFO] Bot da xuat hien tai sanh cho.');
+    console.log('[INFO] Bot da xuat hien.');
     
-    // 1. Tự động gõ lệnh đăng nhập /dn sau khi vào sảnh 2 giây
+    // Tự động gõ lệnh đăng nhập /dn sau khi vào sảnh 2 giây
     setTimeout(() => {
       bot.chat(`/dn ${config.matkhau}`);
       console.log('[AUTH] Da tu dong go /dn.');
     }, 2000);
 
-    // 2. CƠ CHẾ ĐÂM CỔNG CHUYỂN CỤM: Đợi 5 giây đăng nhập xong, tự xoay góc chuẩn nhìn thẳng và chạy
-    setTimeout(async () => {
-      console.log('[LOBBY] Dang quay mat huong thang va chay vao Cong dich chuyen...');
-      try {
-        // Nhìn thẳng về phía trước góc 0 độ để hướng vào tâm cổng dịch chuyển
-        await bot.look(0, 0, true); 
-        
-        // Nhấn giữ phím đi thẳng (W) trong vòng 5 giây để đi xuyên qua cổng
-        bot.setControlState('forward', true);
-        
-        setTimeout(() => {
-          bot.setControlState('forward', false); // Thả phím ra
-          console.log('[LOBBY] Da ket thuc chuoi chay bo.');
-        }, 5000);
-      } catch (err) {
-        console.log(`[LOBBY] Loi cu dong: ${err.message}`);
-      }
-    }, 5000);
-
-    // 3. TỰ ĐỘNG CHECK XYZ IN LOGS RENDER (Cứ 5 giây / 1 lần)
+    // Tự động check XYZ in Logs Render (Cứ 5 giây / 1 lần)
     if (xyzInterval) clearInterval(xyzInterval);
     xyzInterval = setInterval(() => {
       if (bot.entity && bot.entity.position) {
@@ -65,27 +48,76 @@ function startBot() {
       }
     }, 5000);
 
-    // 4. CHẾ ĐỘ SIÊU FARM: Tự động quét và tấn công quái vật đứng sát cạnh bot
+    // Chế độ siêu farm: Tự động quét và tấn công quái vật đứng sát cạnh bot
     if (farmInterval) clearInterval(farmInterval);
     farmInterval = setInterval(() => {
-      if (bot.entity) {
+      if (bot.entity && daVaoCumChinh) { 
         const target = bot.nearestEntity((entity) => entity.type === 'mob');
-        if (target) {
-          bot.attack(target); 
-        }
+        if (target) bot.attack(target); 
       }
     }, 1000); 
   });
 
-  // 5. TỰ ĐỘNG ĐỒNG Ý LỆNH DỊCH CHUYỂN (/tpaccept) KHI BẠN GỌI Ở CỤM CHÍNH
-  bot.on('chat', (username, message) => {
-    if (message.includes('muon dich chuyen') || message.includes('tpa') || message.includes('tpahere')) {
+  // BỘ NHẬN DIỆN LỆNH CLICK MENU (Dùng để vượt sảnh chờ theo ý bạn)
+  bot.on('windowOpen', (window) => {
+    console.log('[MENU] Da mo Menu Dong ho thanh cong.');
+  });
+
+  // =========================================================================
+  // ⚡ TRUNG TÂM ĐIỀU KHIỂN TỪ XA QUA CHAT GAME (CHAT-CONTROLLED) ⚡
+  // Bất kể bot đang ở sảnh chờ hay cụm chính, bạn gõ lệnh trong game bot sẽ làm theo
+  // =========================================================================
+  bot.on('chat', async (username, message) => {
+    // Để bảo mật, bot chỉ nghe lệnh gõ từ tài khoản chính của bạn.
+    // HÃY ĐỔI CHỮ 'Tên_Nick_Chính_Của_Bạn' THÀNH TÊN NHÂN VẬT THẬT BẠN ĐANG CHƠI TRÊN PC
+    const chuNhan = 'Tên_Nick_Chính_Của_Bạn'; 
+    
+    if (username !== chuNhan) return; // Nếu người khác gõ, bot sẽ phớt lờ
+
+    const msg = message.toLowerCase();
+
+    // 1. Lệnh bảo bot tự gõ một lệnh chat bất kỳ (Ví dụ bạn chat: bot chat /smp)
+    if (msg.startsWith('bot chat ')) {
+      const commandToRun = message.substring(9); // Lấy đoạn chữ phía sau chữ 'bot chat '
+      bot.chat(commandToRun);
+      console.log(`[REMOTE] Da ra lenh bot chat: ${commandToRun}`);
+    }
+
+    // 2. Lệnh bảo bot cầm đồng hồ mở Menu (Bạn chat: bot mo menu)
+    if (msg === 'bot mo menu') {
+      bot.setQuickBarSlot(4); // Ô số 5 trên thanh công cụ
       setTimeout(() => {
-        bot.chat('/tpaccept');
-        console.log(`[TELEPORT] Da tu dong nhan lenh /tpaccept tu: ${username}`);
-      }, 2000);
+        bot.activateItem(); // Bấm chuột phải mở thực đơn
+        console.log('[REMOTE] Da ra lenh bot mo Menu Dong ho.');
+      }, 500);
+    }
+
+    // 3. Lệnh bảo bot tự click chuột vào ô số mấy trong Menu (Bạn chat: bot click 35)
+    if (msg.startsWith('bot click ')) {
+      const slotId = parseInt(msg.substring(10)); // Lấy số ô phía sau chữ 'bot click '
+      try {
+        daVaoCumChinh = true; // Khóa sảnh để vào cụm farm
+        await bot.clickWindow(slotId, 0, 0); // Click chuột trái ảo vào ô đó
+        console.log(`[REMOTE] Da ra lenh bot click vao Slot ID: ${slotId}`);
+      } catch (err) {
+        console.log(`[REMOTE] Click loi: ${err.message}`);
+      }
+    }
+
+    // 4. Lệnh bảo bot đồng ý dịch chuyển ngay lập tức (Bạn chat: bot vao day)
+    if (msg === 'bot vao day' || msg.includes('tpa') || msg.includes('tpahere')) {
+      bot.chat('/tpaccept');
+      console.log('[REMOTE] Da ra lenh bot dong y dich chuyen /tpaccept.');
+    }
+
+    // 5. Lệnh bắt bot nhảy lên tại chỗ (Bạn chat: bot nhay)
+    if (msg === 'bot nhay') {
+      bot.setControlState('jump', true);
+      setTimeout(() => bot.setControlState('jump', false), 500);
+      console.log('[REMOTE] Da ra lenh bot nhay.');
     }
   });
+  // =========================================================================
 
   bot.on('end', (reason) => {
     console.log(`[RECONNECT] Mat ket noi: ${reason}. Vao lai sau 30s...`);
