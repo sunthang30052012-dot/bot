@@ -1,4 +1,4 @@
-// File: index.js (Bản Full nâng cấp Màn hình mô phỏng 3D nhìn đường)
+// File: index.js (Bản Full gộp cổng màn hình 3D tránh lỗi Render)
 const mineflayer = require('mineflayer');
 const express = require('express');
 const app = express();
@@ -23,7 +23,7 @@ let botStatus = "Chưa kết nối";
 let currentXYZ = "X: 0 | Y: 0 | Z: 0";
 let isRandomMoving = false;
 
-// Gọi trang giao diện điều khiển
+// Gọi trang giao diện điều khiển chính
 app.get('/', (req, res) => {
   res.send(interface.getHtmlPage(config, botStatus, currentXYZ));
 });
@@ -51,13 +51,13 @@ function connectBot() {
   });
 
   bot.on('spawn', () => {
-    // 🔌 KÍCH HOẠT MÀN HÌNH MÔ PHỎNG 3D NHÌN ĐƯỜNG XUNG QUANH BOT
-    // Hệ thống sẽ mở cổng đồ họa 3001 trực tuyến trên web cho bạn xem
+    // 🔥 GỘP CỔNG ĐỒ HỌA 3D CHẠY CHUNG HỆ THỐNG VỚI WEB CHÍNH
+    // Sử dụng tùy chọn viewServer: io để lồng màn hình Spectator ảo vào server đang có sẵn
     try {
-      mineflayerViewer(bot, { port: 3001, firstPerson: false });
-      console.log('[VIEWER] Màn hình mô phỏng 3D đã sẵn sàng tại cổng 3001!');
+      mineflayerViewer(bot, { viewServer: io, firstPerson: false });
+      console.log('[VIEWER] Màn hình mô phỏng 3D đã gộp cổng thành công!');
     } catch (e) {
-      console.log('[VIEWER] Lỗi khởi động màn hình 3D: ' + e.message);
+      console.log('[VIEWER] Lỗi đồ họa 3D: ' + e.message);
     }
 
     setInterval(() => {
@@ -145,4 +145,5 @@ app.post('/api/click-kingsmp', (req, res) => {
   res.sendStatus(200);
 });
 
+// Chạy ứng dụng trên cổng do Render cấp duy nhất
 http.listen(process.env.PORT || 3000, () => { console.log('Web server san sang.'); });
