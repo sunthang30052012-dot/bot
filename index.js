@@ -36,15 +36,12 @@ function startBot() {
       console.log('[AUTH] Da tu dong go /dn.');
     }, 2000);
 
-    // 2. VƯỢT SẢN CHỜ: Cầm đồng hồ ở ô số 5 (Hotbar slot 4) và click phải mở Menu
+    // 2. VƯỢT SẢNH BẰNG LỆNH CHAT: Gõ thẳng lệnh để chuyển cụm server
+    // (Bỏ qua hoàn toàn việc mở Menu Đồng hồ để tránh bị kẹt vòng lặp)
     setTimeout(() => {
-      console.log('[LOBBY] Dang chuan bi mo Menu bang Dong ho...');
-      bot.setQuickBarSlot(4); 
-      
-      setTimeout(() => {
-        bot.activateItem(); 
-      }, 1500);
-    }, 5000);
+      console.log('[LOBBY] Dang go lenh truc tiep de vao cum KingSMP...');
+      bot.chat('/server kingsmp'); // Tự động gõ lệnh chuyển server trực tiếp
+    }, 6000);
 
     // 3. CHẾ ĐỘ SIÊU FARM: Tự động quét và tấn công mục tiêu đứng sát cạnh bot
     if (farmInterval) clearInterval(farmInterval);
@@ -57,23 +54,6 @@ function startBot() {
         }
       }
     }, 1000); // Tần suất quét chém: 1 giây / 1 lần
-  });
-
-  // 4. TỰ ĐỘNG CLICK CHỌN CỤM KINGSMP KHI MENU MỞ RA (Chuyển sang chế độ Click Chuột Phải)
-  bot.on('windowOpen', (window) => {
-    console.log('[MENU] Da mo Menu Dong ho thanh cong. Dang doi tai du lieu...');
-    
-    // Đợi hẳn 2 giây cho Menu tải xong thông tin ổn định rồi mới tương tác
-    setTimeout(async () => {
-      try {
-        console.log('[LOBBY] Thu nghiem Click chuot PHAI (Slot 4) vao KingSMP...');
-        // clickWindow(số_ô, loại_click, chế_độ). Số 1 ở giữa đại diện cho Click Chuột Phải
-        await bot.clickWindow(4, 1, 0); 
-        console.log('[LOBBY] Da gui lenh click chuot PHAI thanh cong!');
-      } catch (err) {
-        console.log(`[LOBBY] Loi khi click Menu: ${err.message}`);
-      }
-    }, 2000);
   });
 
   // 5. CƠ CHẾ TỰ ĐỘNG VÀO LẠI GAME KHI SERVER SẬP HOẶC BẢO TRÌ
