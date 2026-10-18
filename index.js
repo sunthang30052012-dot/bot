@@ -1,10 +1,11 @@
-// File: index.js (Chứa logic xử lý Bot & gọi giao diện từ file interface.js)
+// File: index.js (Bản Full nâng cấp Màn hình mô phỏng 3D nhìn đường)
 const mineflayer = require('mineflayer');
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-const interface = require('./interface'); // Kết nối đồng bộ với file interface.js
+const mineflayerViewer = require('prismarine-viewer').mineflayer; // Kích hoạt mắt nhìn 3D
+const interface = require('./interface'); 
 
 app.use(express.json());
 
@@ -22,7 +23,7 @@ let botStatus = "Chưa kết nối";
 let currentXYZ = "X: 0 | Y: 0 | Z: 0";
 let isRandomMoving = false;
 
-// Gọi trang web giao diện liền khối từ file thứ nhất
+// Gọi trang giao diện điều khiển
 app.get('/', (req, res) => {
   res.send(interface.getHtmlPage(config, botStatus, currentXYZ));
 });
@@ -50,6 +51,15 @@ function connectBot() {
   });
 
   bot.on('spawn', () => {
+    // 🔌 KÍCH HOẠT MÀN HÌNH MÔ PHỎNG 3D NHÌN ĐƯỜNG XUNG QUANH BOT
+    // Hệ thống sẽ mở cổng đồ họa 3001 trực tuyến trên web cho bạn xem
+    try {
+      mineflayerViewer(bot, { port: 3001, firstPerson: false });
+      console.log('[VIEWER] Màn hình mô phỏng 3D đã sẵn sàng tại cổng 3001!');
+    } catch (e) {
+      console.log('[VIEWER] Lỗi khởi động màn hình 3D: ' + e.message);
+    }
+
     setInterval(() => {
       if (bot && bot.entity && bot.entity.position) {
         const pos = bot.entity.position;
