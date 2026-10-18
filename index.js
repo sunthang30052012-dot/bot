@@ -1,11 +1,10 @@
-// File: index.js (Bản Full gộp cổng màn hình 3D tránh lỗi Render)
+// File: index.js (Bản Full Panel + Khung Chat ổn định không lỗi Đám mây)
 const mineflayer = require('mineflayer');
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-const mineflayerViewer = require('prismarine-viewer').mineflayer; // Kích hoạt mắt nhìn 3D
-const interface = require('./interface'); 
+const interface = require('./interface'); // Kết nối đồng bộ với file interface.js
 
 app.use(express.json());
 
@@ -23,7 +22,7 @@ let botStatus = "Chưa kết nối";
 let currentXYZ = "X: 0 | Y: 0 | Z: 0";
 let isRandomMoving = false;
 
-// Gọi trang giao diện điều khiển chính
+// Gọi trang giao diện điều khiển chính từ file interface.js
 app.get('/', (req, res) => {
   res.send(interface.getHtmlPage(config, botStatus, currentXYZ));
 });
@@ -51,15 +50,6 @@ function connectBot() {
   });
 
   bot.on('spawn', () => {
-    // 🔥 GỘP CỔNG ĐỒ HỌA 3D CHẠY CHUNG HỆ THỐNG VỚI WEB CHÍNH
-    // Sử dụng tùy chọn viewServer: io để lồng màn hình Spectator ảo vào server đang có sẵn
-    try {
-      mineflayerViewer(bot, { viewServer: io, firstPerson: false });
-      console.log('[VIEWER] Màn hình mô phỏng 3D đã gộp cổng thành công!');
-    } catch (e) {
-      console.log('[VIEWER] Lỗi đồ họa 3D: ' + e.message);
-    }
-
     setInterval(() => {
       if (bot && bot.entity && bot.entity.position) {
         const pos = bot.entity.position;
