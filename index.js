@@ -49,6 +49,18 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ha, hb);
 }
  
+// [SỬA] Lấy tên hiển thị của item dưới dạng chữ thường (bỏ JSON / mã màu §) để tìm theo tên
+function chuTen(it) {
+  let n = it && it.customName;
+  if (!n) return '';
+  if (typeof n !== 'string') n = n.toString();
+  try {
+    const flat = (j) => (typeof j === 'string' ? j : (j.text || '') + (j.extra || []).map(flat).join(''));
+    n = flat(JSON.parse(n));
+  } catch (e) { /* không phải JSON thì giữ nguyên */ }
+  return n.replace(/§./g, '').trim();
+}
+ 
 // Hàm lưu log để hiển thị lên giao diện web
 function logToWeb(msg) {
   // [SỬA] Hiện giờ Việt Nam (máy chủ host thường chạy giờ UTC)
@@ -112,7 +124,7 @@ app.get('/', (req, res) => {
  
         <h3>⚡ HÀNH ĐỘNG NHANH ⚡</h3>
         <form action="/action" method="POST" style="display:inline;"><button class="btn btn-orange" name="cmd" value="menu">1. Mở Menu Đồng Hồ</button></form>
-        <form action="/action" method="POST" style="display:inline;"><button class="btn" name="cmd" value="click35">2. Click Vào KingSMP (Ô 36)</button></form>
+        <form action="/action" method="POST" style="display:inline;"><button class="btn" name="cmd" value="click35">2. Click Vào KingSMP</button></form>
         <form action="/action" method="POST" style="display:inline;"><button class="btn btn-blue" name="cmd" value="tpa">3. Đồng Ý Dịch Chuyển (/tpaccept)</button></form>
         <form action="/action" method="POST" style="display:inline;"><button class="btn btn-orange" name="cmd" value="jump">4. Nhảy Lên Tại Chỗ</button></form>
  
@@ -156,12 +168,12 @@ app.post('/action', async (req, res) => {
       logToWeb('Chưa có menu nào đang mở. Bấm nút 1 trước, đợi menu hiện ra rồi mới bấm nút 2.');
     } else {
       try {
-        // [SỬA] Tự tìm ô có chữ "smp" trong menu; không thấy thì dùng ô 35 như cũ
+        // [SỬA] Tự tìm ô tên "KingSMP" trong menu; không thấy thì dùng ô 24 (theo ảnh menu thật)
         const w = bot.currentWindow;
-        let slot = 35;
+        let slot = 24;
         for (let i = 0; i < w.inventoryStart; i++) {
           const it = w.slots[i];
-          if (it && /smp/i.test(`${it.name} ${it.customName || ''}`)) { slot = i; break; }
+          if (it && /king\s*smp/i.test(chuTen(it))) { slot = i; break; }
         }
         await bot.clickWindow(slot, 0, 0);
         logToWeb(`Nút bấm Web: Đã ra lệnh bot click vào Slot ${slot} (KingSMP).`);
@@ -269,7 +281,8 @@ function startBot() {
     const ds = [];
     for (let i = 0; i < window.inventoryStart; i++) {
       const it = window.slots[i];
-      if (it) ds.push(`${i}:${it.name}${it.customName ? '(' + String(it.customName).replace(/\s+/g, ' ').slice(0, 40) + ')' : ''}`);
+      if (!it || /glass_pane/.test(it.name)) continue; // bỏ ô kính viền trang trí
+      ds.push(`${i}:${chuTen(it) || it.name}`);
     }
     logToWeb(`Các ô trong menu: ${ds.join(' | ') || '(trống)'}`);
   });
@@ -299,3 +312,4 @@ function startBot() {
 }
  
 startBot();
+ 
