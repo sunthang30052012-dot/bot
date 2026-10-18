@@ -1,29 +1,31 @@
-// File: index.js (Bản Full mở cổng truyền dữ liệu Spectator 3D từ xa)
+// File: index.js (Bản dùng radar ký tự ngay trên web, không cần prismarine-viewer)
 const mineflayer = require('mineflayer');
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-const interface = require('./interface'); 
+const ui = require('./interface');
+const { renderRadar } = require('./radar');
 
 app.use(express.json());
 
 const config = {
   host: 'kingmc.vn',
   username: 'ipttdup',
-  version: '1.20.1',
-  matkhau: 'Sam270311'
+  version: '1.20.1'
 };
 
 let bot = null;
 let farmInterval = null;
 let randomMoveInterval = null;
+let xyzInterval = null;
+let radarInterval = null;
 let botStatus = "Chưa kết nối";
 let currentXYZ = "X: 0 | Y: 0 | Z: 0";
 let isRandomMoving = false;
 
 app.get('/', (req, res) => {
-  res.send(interface.getHtmlPage(config, botStatus, currentXYZ));
+  res.send(ui.getHtmlPage(config, botStatus, currentXYZ));
 });
 
 io.on('connection', (socket) => {
@@ -33,6 +35,13 @@ io.on('connection', (socket) => {
 setInterval(() => {
   io.emit('statusUpdate', { status: botStatus, xyz: currentXYZ, isRandomMoving: isRandomMoving });
 }, 1500);
+
+function clearBotIntervals() {
+  clearInterval(farmInterval);
+  clearInterval(randomMoveInterval);
+  clearInterval(xyzInterval);
+  clearInterval(radarInterval);
+}
 
 function connectBot() {
   if (bot) return;
@@ -44,69 +53,68 @@ function connectBot() {
     version: config.version
   });
 
-  bot.on('login', () => { 
+  bot.on('login', () => {
     botStatus = "Đang ở Sảnh chờ Lobby (Hãy gõ lệnh đăng nhập)";
   });
 
   bot.on('spawn', () => {
-    // THIẾT LẬP MỞ ĐƯỜNG TRUYỀN DỮ LIỆU ĐỒ HỌA 3D 
-    // Cho phép máy tính của bạn kết nối vào để vẽ hình ảnh Spectator
-    try {
-      require('prismarine-viewer').mineflayer(bot, { port: 3001, firstPerson: false });
-      console.log('[VIEWER] Cong du lieu 3D mo tai 3001!');
-    } catch (e) {
-      console.log('[VIEWER] Cho phep ket noi tu xa');
-    }
+    clearBotIntervals();
 
-    setInterval(() => {
+    xyzInterval = setInterval(() => {
       if (bot && bot.entity && bot.entity.position) {
         const pos = bot.entity.position;
         currentXYZ = `X: ${Math.round(pos.x)} | Y: ${Math.round(pos.y)} | Z: ${Math.round(pos.z)}`;
         if (Math.round(pos.z) > 40 || Math.round(pos.x) > 10) {
-            botStatus = "Đã vào thế giới chính cụm KingSMP thành công! 🎉";
+          botStatus = "Đã vào thế giới chính cụm KingSMP thành công! 🎉";
         }
       }
     }, 1000);
 
-    if (farmInterval) clearInterval(farmInterval);
+    radarInterval = setInterval(() => {
+      try {
+        io.emit('radarUpdate', renderRadar(bot));
+      } catch (e) {
+        io.emit('radarUpdate', 'Lỗi radar: ' + e.message);
+      }
+    }, 1000);
+
     farmInterval = setInterval(() => {
       if (bot && bot.entity) {
         const target = bot.nearestEntity((entity) => entity.type === 'mob');
-        if (target) bot.attack(target); 
+        if (target) bot.attack(target);
       }
-    }, 1000); 
+    }, 1000);
   });
 
   bot.on('message', (jsonMsg) => {
-    const plainText = jsonMsg.toString();
-    io.emit('minecraftChat', plainText);
+    io.emit('minecraftChat', jsonMsg.toString());
   });
 
-  bot.on('windowOpen', (window) => { botStatus = "Menu Đồng hồ đã mở! Sẵn sàng click ô 24."; });
-  bot.on('error', (err) => { botStatus = "Lỗi hệ thống: " + err.message; bot = null; });
-  bot.on('end', (reason) => {
+  bot.on('windowOpen', () => { botStatus = "Menu Đồng hồ đã mở! Sẵn sàng click ô 24."; });
+  bot.on('error', (err) => { botStatus = "Lỗi hệ thống: " + err.message; });
+  bot.on('end', () => {
     botStatus = "Bot đã ngắt kết nối.";
     bot = null;
     isRandomMoving = false;
-    clearInterval(farmInterval);
-    clearInterval(randomMoveInterval);
+    clearBotIntervals();
+    io.emit('radarUpdate', 'Bot chưa bật hoặc chưa vào game...');
   });
 }
 
 app.post('/api/start', (req, res) => { connectBot(); res.sendStatus(200); });
-app.post('/api/stop', (req, res) => { if(bot) { bot.quit(); bot = null; } res.sendStatus(200); });
-app.post('/api/chat', (req, res) => { if(bot) bot.chat(req.body.text); res.sendStatus(200); });
-app.post('/api/tpaccept', (req, res) => { if(bot) bot.chat('/tpaccept'); res.sendStatus(200); });
+app.post('/api/stop', (req, res) => { if (bot) bot.quit(); res.sendStatus(200); });
+app.post('/api/chat', (req, res) => { if (bot) bot.chat(req.body.text); res.sendStatus(200); });
+app.post('/api/tpaccept', (req, res) => { if (bot) bot.chat('/tpaccept'); res.sendStatus(200); });
 
 app.post('/api/move', (req, res) => {
   if (bot && bot.entity) {
     const dir = req.body.dir;
     if (dir === 'jump') {
       bot.setControlState('jump', true);
-      setTimeout(() => bot.setControlState('jump', false), 400);
+      setTimeout(() => { if (bot) bot.setControlState('jump', false); }, 400);
     } else {
       bot.setControlState(dir, true);
-      setTimeout(() => { if(bot) bot.setControlState(dir, false); }, 500);
+      setTimeout(() => { if (bot) bot.setControlState(dir, false); }, 500);
     }
   }
   res.sendStatus(200);
@@ -124,7 +132,7 @@ app.post('/api/toggle-random', (req, res) => {
         const moves = ['forward', 'back', 'left', 'right', 'jump'];
         const randomMove = moves[Math.floor(Math.random() * moves.length)];
         bot.setControlState(randomMove, true);
-        setTimeout(() => { if(bot) bot.setControlState(randomMove, false); }, 400);
+        setTimeout(() => { if (bot) bot.setControlState(randomMove, false); }, 400);
       }
     }, 4000);
   } else {
@@ -134,12 +142,12 @@ app.post('/api/toggle-random', (req, res) => {
 });
 
 app.post('/api/open-menu', (req, res) => {
-  if(bot) { bot.setQuickBarSlot(4); setTimeout(() => { bot.activateItem(); }, 1000); }
+  if (bot) { bot.setQuickBarSlot(4); setTimeout(() => { if (bot) bot.activateItem(); }, 1000); }
   res.sendStatus(200);
 });
 
 app.post('/api/click-kingsmp', (req, res) => {
-  if(bot) bot.clickWindow(24, 0, 0).catch(e => console.log(e.message));
+  if (bot) bot.clickWindow(24, 0, 0).catch(e => console.log(e.message));
   res.sendStatus(200);
 });
 
