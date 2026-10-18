@@ -14,6 +14,7 @@ const config = {
 
 let bot;
 let farmInterval;
+let xyzInterval;
 let daVaoCumChinh = false;
 
 function startBot() {
@@ -37,7 +38,7 @@ function startBot() {
       console.log('[AUTH] Da tu dong go /dn.');
     }, 2000);
 
-    // 2. MỞ MENU: Đợi hẳn 8 giây cho đăng nhập hoàn tất mới cầm đồng hồ mở thực đơn
+    // 2. MỞ MENU: Đợi 8 giây cho đăng nhập hoàn tất mới cầm đồng hồ mở thực đơn
     setTimeout(() => {
       if (!daVaoCumChinh) {
         console.log('[LOBBY] Dang chuan bi mo Menu bang Dong ho...');
@@ -49,7 +50,19 @@ function startBot() {
       }
     }, 8000);
 
-    // 3. CHẾ ĐỘ SIÊU FARM: Tự động quét và tấn công mục tiêu đứng sát cạnh
+    // 3. TÍNH NĂNG ĐẶC BIỆT: TỰ ĐỘNG CHECK XYZ VÀ IN LOGS LÊN RENDER
+    // Cứ sau 5 giây, bot sẽ quét và in vị trí hiện tại của nó ra màn hình
+    if (xyzInterval) clearInterval(xyzInterval);
+    xyzInterval = setInterval(() => {
+      if (bot.entity && bot.entity.position) {
+        const pos = bot.entity.position;
+        const currentWorld = bot.game ? bot.game.dimension : 'Unkown';
+        // In ra màn hình ảo tọa độ X, Y, Z làm tròn số cho dễ nhìn
+        console.log(`[CHECK XYZ] Vi tri hien tai: X: ${Math.round(pos.x)} | Y: ${Math.round(pos.y)} | Z: ${Math.round(pos.z)} | The gioi: ${currentWorld}`);
+      }
+    }, 5000);
+
+    // 4. CHẾ ĐỘ SIÊU FARM: Tự động quét và tấn công mục tiêu đứng sát cạnh
     if (farmInterval) clearInterval(farmInterval);
     farmInterval = setInterval(() => {
       if (bot.entity) {
@@ -61,20 +74,18 @@ function startBot() {
     }, 1000); 
   });
 
-  // 4. XỬ LÝ MENU: Ép buộc click chính xác vào Slot 35 (Khối vàng KingSMP theo ảnh)
+  // 5. XỬ LÝ MENU: Ép buộc click chính xác vào Slot 35 (Khối vàng KingSMP theo ảnh thực tế)
   bot.on('windowOpen', (window) => {
     if (daVaoCumChinh) return;
     console.log('[MENU] Da mo Menu Dong ho thanh cong. Dang doi tai du lieu...');
 
-    // Đợi 2 giây cho Menu tải xong thông tin ổn định rồi mới click
     setTimeout(async () => {
       try {
         console.log('[LOBBY] Ep buoc click chuot trai vao o so 36 (Slot ID 35) de vao KingSMP...');
         daVaoCumChinh = true; // Khóa lệnh để tránh lặp lại
         
-        // Thực hiện lệnh click ảo chính xác vào ô khối vàng KingSMP dựa theo ảnh chụp
-        await bot.clickWindow(35, 0, 0); 
-        console.log('[LOBBY] Da gui lenh click chuot trai vào o KingSMP thanh cong!');
+        await bot.clickWindow(35, 0, 0); // Click chuột trái trúng khối vàng KingSMP
+        console.log('[LOBBY] Da gui lenh click chuot trai vao o KingSMP thanh cong!');
       } catch (err) {
         console.log(`[LOBBY] Loi click Menu: ${err.message}`);
         daVaoCumChinh = false;
@@ -85,6 +96,7 @@ function startBot() {
   bot.on('end', (reason) => {
     console.log(`[RECONNECT] Mat ket noi: ${reason}. Vao lai sau 30s...`);
     clearInterval(farmInterval);
+    clearInterval(xyzInterval);
     setTimeout(startBot, 30000);
   });
   
