@@ -1,11 +1,11 @@
-// File: index.js (Bản dùng radar ký tự ngay trên web, không cần prismarine-viewer)
+// ============================================================
+// index.js - FULL 1 FILE: Bot + Web Panel + Màn hình 2D mô phỏng 3D + Radar
+// ============================================================
 const mineflayer = require('mineflayer');
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-const ui = require('./interface');
-const { renderRadar } = require('./radar');
 
 app.use(express.json());
 
@@ -19,136 +19,160 @@ let bot = null;
 let farmInterval = null;
 let randomMoveInterval = null;
 let xyzInterval = null;
-let radarInterval = null;
+let screenInterval = null;
 let botStatus = "Chưa kết nối";
 let currentXYZ = "X: 0 | Y: 0 | Z: 0";
 let isRandomMoving = false;
 
-app.get('/', (req, res) => {
-  res.send(ui.getHtmlPage(config, botStatus, currentXYZ));
-});
+// ------------------------------------------------------------
+// MÀN HÌNH 1: MÔ PHỎNG 3D GÓC NHÌN NGƯỜI CHƠI (bắn tia bằng ký tự)
+// ------------------------------------------------------------
+const VIEW_W = 56;                     // số cột
+const VIEW_H = 20;                     // số hàng
+const FOV_H = 80 * Math.PI / 180;      // góc nhìn ngang
+const FOV_V = FOV_H * (VIEW_H / VIEW_W) * 2; // ký tự cao gấp ~2 lần rộng
+const MAX_DIST = 15;                   // nhìn xa tối đa (block)
+const STEP = 0.35;                     // bước tia
+const WALL_CHARS = '@#%*=-:.';         // gần -> xa (mặt đứng)
+const FLOOR_CHARS = '%*+=-:,.';        // gần -> xa (nền / trần)
 
-io.on('connection', (socket) => {
-  socket.emit('statusUpdate', { status: botStatus, xyz: currentXYZ, isRandomMoving: isRandomMoving });
-});
-
-setInterval(() => {
-  io.emit('statusUpdate', { status: botStatus, xyz: currentXYZ, isRandomMoving: isRandomMoving });
-}, 1500);
-
-function clearBotIntervals() {
-  clearInterval(farmInterval);
-  clearInterval(randomMoveInterval);
-  clearInterval(xyzInterval);
-  clearInterval(radarInterval);
+function shade(chars, dist) {
+  const i = Math.min(chars.length - 1, Math.floor((dist / MAX_DIST) * chars.length));
+  return chars[i];
 }
 
-function connectBot() {
-  if (bot) return;
-  botStatus = "Đang kết nối vào máy chủ...";
+function renderView(b) {
+  if (!b || !b.entity) return 'Bot chưa vào game...';
+  const eye = b.entity.position.offset(0, 1.62, 0);
+  const yaw = b.entity.yaw;
+  const pitch = b.entity.pitch;
+  const lines = [];
 
-  bot = mineflayer.createBot({
-    host: config.host,
-    username: config.username,
-    version: config.version
-  });
+  for (let r = 0; r < VIEW_H; r++) {
+    const rp = pitch + (0.5 - (r + 0.5) / VIEW_H) * FOV_V;
+    const cp = Math.cos(rp);
+    const dy = Math.sin(rp);
+    let line = '';
 
-  bot.on('login', () => {
-    botStatus = "Đang ở Sảnh chờ Lobby (Hãy gõ lệnh đăng nhập)";
-  });
+    for (let c = 0; c < VIEW_W; c++) {
+      const a = ((c + 0.5) / VIEW_W - 0.5) * FOV_H;
+      const ry = yaw - a;
+      const dx = -Math.sin(ry) * cp;
+      const dz = -Math.cos(ry) * cp;
 
-  bot.on('spawn', () => {
-    clearBotIntervals();
+      let ch = ' ';
+      let pfx = Math.floor(eye.x), pfy = Math.floor(eye.y), pfz = Math.floor(eye.z);
 
-    xyzInterval = setInterval(() => {
-      if (bot && bot.entity && bot.entity.position) {
-        const pos = bot.entity.position;
-        currentXYZ = `X: ${Math.round(pos.x)} | Y: ${Math.round(pos.y)} | Z: ${Math.round(pos.z)}`;
-        if (Math.round(pos.z) > 40 || Math.round(pos.x) > 10) {
-          botStatus = "Đã vào thế giới chính cụm KingSMP thành công! 🎉";
+      for (let d = STEP; d <= MAX_DIST; d += STEP) {
+        const blk = b.blockAt(eye.offset(dx * d, dy * d, dz * d));
+        if (!blk) continue;
+
+        const fx = Math.floor(eye.x + dx * d);
+        const fy = Math.floor(eye.y + dy * d);
+        const fz = Math.floor(eye.z + dz * d);
+
+        if (blk.name.includes('water')) { ch = '~'; break; }
+        if (blk.name.includes('lava')) { ch = '!'; break; }
+        if (blk.boundingBox === 'block') {
+          const isFlatFace = (fy !== pfy && fx === pfx && fz === pfz);
+          ch = isFlatFace ? shade(FLOOR_CHARS, d) : shade(WALL_CHARS, d);
+          break;
         }
+        pfx = fx; pfy = fy; pfz = fz;
       }
-    }, 1000);
-
-    radarInterval = setInterval(() => {
-      try {
-        io.emit('radarUpdate', renderRadar(bot));
-      } catch (e) {
-        io.emit('radarUpdate', 'Lỗi radar: ' + e.message);
-      }
-    }, 1000);
-
-    farmInterval = setInterval(() => {
-      if (bot && bot.entity) {
-        const target = bot.nearestEntity((entity) => entity.type === 'mob');
-        if (target) bot.attack(target);
-      }
-    }, 1000);
-  });
-
-  bot.on('message', (jsonMsg) => {
-    io.emit('minecraftChat', jsonMsg.toString());
-  });
-
-  bot.on('windowOpen', () => { botStatus = "Menu Đồng hồ đã mở! Sẵn sàng click ô 24."; });
-  bot.on('error', (err) => { botStatus = "Lỗi hệ thống: " + err.message; });
-  bot.on('end', () => {
-    botStatus = "Bot đã ngắt kết nối.";
-    bot = null;
-    isRandomMoving = false;
-    clearBotIntervals();
-    io.emit('radarUpdate', 'Bot chưa bật hoặc chưa vào game...');
-  });
+      line += ch;
+    }
+    lines.push(line);
+  }
+  return lines.join('\n');
 }
 
-app.post('/api/start', (req, res) => { connectBot(); res.sendStatus(200); });
-app.post('/api/stop', (req, res) => { if (bot) bot.quit(); res.sendStatus(200); });
-app.post('/api/chat', (req, res) => { if (bot) bot.chat(req.body.text); res.sendStatus(200); });
-app.post('/api/tpaccept', (req, res) => { if (bot) bot.chat('/tpaccept'); res.sendStatus(200); });
+// ------------------------------------------------------------
+// MÀN HÌNH 2: RADAR NHÌN TỪ TRÊN XUỐNG
+// ------------------------------------------------------------
+const RADIUS = 8; // 8 => lưới 17x17
 
-app.post('/api/move', (req, res) => {
-  if (bot && bot.entity) {
-    const dir = req.body.dir;
-    if (dir === 'jump') {
-      bot.setControlState('jump', true);
-      setTimeout(() => { if (bot) bot.setControlState('jump', false); }, 400);
-    } else {
-      bot.setControlState(dir, true);
-      setTimeout(() => { if (bot) bot.setControlState(dir, false); }, 500);
+function blockChar(name) {
+  if (name.includes('water')) return '~';
+  if (name.includes('lava')) return '!';
+  if (name.includes('leaves')) return '%';
+  if (name.includes('log') || name.includes('wood')) return '|';
+  if (name.includes('sand')) return ':';
+  if (name.includes('snow') || name.includes('ice')) return '*';
+  if (name.includes('grass') || name.includes('fern')) return '.';
+  if (name.includes('dirt') || name.includes('path') || name.includes('mud')) return ',';
+  if (name.includes('stone') || name.includes('deepslate') || name.includes('ore')) return '=';
+  return '+';
+}
+
+function topBlock(b, base, dx, dz) {
+  for (let dy = 3; dy >= -4; dy--) {
+    const blk = b.blockAt(base.offset(dx, dy, dz));
+    if (blk && blk.name !== 'air' && blk.name !== 'cave_air' && blk.name !== 'void_air') {
+      return { block: blk, dy };
     }
   }
-  res.sendStatus(200);
-});
+  return null;
+}
 
-app.post('/api/toggle-random', (req, res) => {
-  if (!bot) return res.sendStatus(200);
-  isRandomMoving = !isRandomMoving;
-  if (isRandomMoving) {
-    randomMoveInterval = setInterval(() => {
-      if (bot && bot.entity) {
-        const yaw = (Math.random() * 360) * (Math.PI / 180);
-        const pitch = ((Math.random() * 40) - 20) * (Math.PI / 180);
-        bot.look(yaw, pitch, true);
-        const moves = ['forward', 'back', 'left', 'right', 'jump'];
-        const randomMove = moves[Math.floor(Math.random() * moves.length)];
-        bot.setControlState(randomMove, true);
-        setTimeout(() => { if (bot) bot.setControlState(randomMove, false); }, 400);
-      }
-    }, 4000);
-  } else {
-    clearInterval(randomMoveInterval);
+function facing(yaw) {
+  const deg = ((yaw * 180) / Math.PI + 360) % 360;
+  const dirs = ['Bắc', 'Tây', 'Nam', 'Đông'];
+  return dirs[Math.round(deg / 90) % 4];
+}
+
+function renderRadar(b) {
+  if (!b || !b.entity) return 'Bot chưa vào game...';
+  const base = b.entity.position.floored();
+
+  const marks = new Map();
+  for (const id in b.entities) {
+    const e = b.entities[id];
+    if (!e || e === b.entity || !e.position) continue;
+    const dx = Math.floor(e.position.x) - base.x;
+    const dz = Math.floor(e.position.z) - base.z;
+    if (Math.abs(dx) > RADIUS || Math.abs(dz) > RADIUS) continue;
+    if (e.type === 'player') marks.set(dx + ',' + dz, 'P');
+    else if (e.type === 'mob' || e.type === 'hostile') marks.set(dx + ',' + dz, 'M');
   }
-  res.sendStatus(200);
-});
 
-app.post('/api/open-menu', (req, res) => {
-  if (bot) { bot.setQuickBarSlot(4); setTimeout(() => { if (bot) bot.activateItem(); }, 1000); }
-  res.sendStatus(200);
-});
+  const lines = [];
+  for (let dz = -RADIUS; dz <= RADIUS; dz++) {
+    const row = [];
+    for (let dx = -RADIUS; dx <= RADIUS; dx++) {
+      let ch;
+      if (dx === 0 && dz === 0) ch = '@';
+      else if (marks.has(dx + ',' + dz)) ch = marks.get(dx + ',' + dz);
+      else {
+        const t = topBlock(b, base, dx, dz);
+        if (!t) ch = ' ';
+        else if (t.dy >= 1 && !t.block.name.includes('water')) ch = '#';
+        else ch = blockChar(t.block.name);
+      }
+      row.push(ch);
+    }
+    lines.push(row.join(' '));
+  }
 
-app.post('/api/click-kingsmp', (req, res) => {
-  if (bot) bot.clickWindow(24, 0, 0).catch(e => console.log(e.message));
-  res.sendStatus(200);
-});
+  const header = 'Hướng nhìn: ' + facing(b.entity.yaw) + '  |  Bắc ↑\n';
+  const legend = '\n@ Bot  P Người  M Mob  # Tường  . Cỏ  , Đất  = Đá  ~ Nước  ! Dung nham  | Gỗ  % Lá  : Cát';
+  return header + lines.join('\n') + legend;
+}
 
-http.listen(process.env.PORT || 3000, () => { console.log('Web server san sang.'); });
+// ------------------------------------------------------------
+// GIAO DIỆN WEB PANEL
+// ------------------------------------------------------------
+function getHtmlPage(cfg, status, xyz) {
+  return `
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Minecraft Bot Ultimate Control Panel</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; margin: 0; padding: 20px; display: flex; justify-content: center; }
+            .wrapper { display: grid; grid-template-columns: 450px 450px; gap: 20px; background: #1e1e1e; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); align-items: start; max-width: 950px; width: 100%; box-sizing: border-box; }
+            .panel { background: #252525; padding: 20px; border-radius: 10px; box-sizing: border-box; }
+            .right-container { display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; }
+            .chat-container,
