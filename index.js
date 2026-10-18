@@ -1,4 +1,4 @@
-// File: index.js (Chứa logic xử lý Bot & Quét block lập ma trận ký tự)
+// File: index.js (Bản Full mở cổng truyền dữ liệu Spectator 3D từ xa)
 const mineflayer = require('mineflayer');
 const express = require('express');
 const app = express();
@@ -18,7 +18,6 @@ const config = {
 let bot = null;
 let farmInterval = null;
 let randomMoveInterval = null;
-let radarInterval = null;
 let botStatus = "Chưa kết nối";
 let currentXYZ = "X: 0 | Y: 0 | Z: 0";
 let isRandomMoving = false;
@@ -50,6 +49,15 @@ function connectBot() {
   });
 
   bot.on('spawn', () => {
+    // THIẾT LẬP MỞ ĐƯỜNG TRUYỀN DỮ LIỆU ĐỒ HỌA 3D 
+    // Cho phép máy tính của bạn kết nối vào để vẽ hình ảnh Spectator
+    try {
+      require('prismarine-viewer').mineflayer(bot, { port: 3001, firstPerson: false });
+      console.log('[VIEWER] Cong du lieu 3D mo tai 3001!');
+    } catch (e) {
+      console.log('[VIEWER] Cho phep ket noi tu xa');
+    }
+
     setInterval(() => {
       if (bot && bot.entity && bot.entity.position) {
         const pos = bot.entity.position;
@@ -59,48 +67,6 @@ function connectBot() {
         }
       }
     }, 1000);
-
-    // 👁️ CƠ CHẾ QUÉT MÔ PHỎNG BLOCK XUNG QUANH (MẮT THẦN KÝ TỰ)
-    if (radarInterval) clearInterval(radarInterval);
-    radarInterval = setInterval(() => {
-      if (!bot || !bot.entity) return;
-      
-      const p = bot.entity.position;
-      let viewText = " GÓC NHÌN BẢN ĐỒ ẢO 5x5 (Bot nằm ở tâm [🤖])\n";
-      viewText += "=========================================\n";
-      
-      // Quét ma trận 5x5 block xung quanh vị trí ngang chân bot (Y)
-      for (let zOffset = -2; zOffset <= 2; zOffset++) {
-        let rowText = "";
-        for (let xOffset = -2; xOffset <= 2; xOffset++) {
-          if (xOffset === 0 && zOffset === 0) {
-            rowText += "[🤖]"; // Tâm ma trận chính là vị trí của con Bot
-            continue;
-          }
-          
-          const blockPos = p.offset(xOffset, 0, zOffset);
-          const block = bot.blockAt(blockPos);
-          
-          // Định dạng các ký tự hiển thị tùy theo loại block
-          if (!block || block.name === 'air') {
-            rowText += "[  ]"; // Ô trống / Không khí
-          } else if (block.name.includes('glass')) {
-            rowText += "[🔲]"; // Kính giống y hệt chuồng kính trong ảnh của bạn!
-          } else if (block.name.includes('chest')) {
-            rowText += "[📦]"; // Rương đồ
-          } else if (block.name.includes('sand') || block.name.includes('dirt')) {
-            rowText += "[🧱]"; // Đất hoặc Cát dưới chân
-          } else {
-            rowText += "[■]"; // Các khối block đặc khác (Đá, Gỗ...)
-          }
-        }
-        viewText += rowText + "\n";
-      }
-      viewText += "=========================================\n";
-      viewText += "Ký hiệu: [🔲]:Kính | [📦]:Rương | [🧱]:Đất/Cát | [  ]:Trống";
-      
-      io.emit('radarUpdate', viewText); // Đẩy dữ liệu bức tranh ký tự ra ngoài trang web
-    }, 1000); // Cứ mỗi 1 giây tự động quét vẽ lại bản đồ block 1 lần
 
     if (farmInterval) clearInterval(farmInterval);
     farmInterval = setInterval(() => {
@@ -124,7 +90,6 @@ function connectBot() {
     isRandomMoving = false;
     clearInterval(farmInterval);
     clearInterval(randomMoveInterval);
-    clearInterval(radarInterval);
   });
 }
 
