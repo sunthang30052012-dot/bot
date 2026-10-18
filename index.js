@@ -5,7 +5,6 @@ const app = express();
 app.get('/', (req, res) => { res.send('Bot KingMC dang hoat dong!'); });
 app.listen(process.env.PORT || 3000, () => { console.log('Web server da san sang.'); });
 
-// === THÔNG TIN TÀI KHOẢN BOT ===
 const config = {
   host: 'kingmc.vn',
   username: 'ipttdup',
@@ -36,27 +35,25 @@ function startBot() {
       console.log('[AUTH] Da tu dong go /dn.');
     }, 2000);
 
-    // 2. VƯỢT SẢNH BẰNG LỆNH CHAT: Gõ thẳng lệnh để chuyển cụm server
-    // (Bỏ qua hoàn toàn việc mở Menu Đồng hồ để tránh bị kẹt vòng lặp)
+    // 2. VƯỢT SẢNH BẰNG LỆNH CHAT: Tăng delay lên hẳn 8 giây để đảm bảo 
+    // tài khoản đăng nhập thành công tuyệt đối trước khi chuyển cụm
     setTimeout(() => {
       console.log('[LOBBY] Dang go lenh truc tiep de vao cum KingSMP...');
-      bot.chat('/server kingsmp'); // Tự động gõ lệnh chuyển server trực tiếp
-    }, 6000);
+      bot.chat('/server kingsmp'); 
+    }, 8000);
 
-    // 3. CHẾ ĐỘ SIÊU FARM: Tự động quét và tấn công mục tiêu đứng sát cạnh bot
+    // 3. CHẾ ĐỘ SIÊU FARM: Tự động quét và tấn công quái vật/người chơi đứng sát cạnh
     if (farmInterval) clearInterval(farmInterval);
     farmInterval = setInterval(() => {
       if (bot.entity) {
-        // Quét tìm quái vật (mob) hoặc người chơi khác ở gần trong phạm vi chém
         const target = bot.nearestEntity((entity) => entity.type === 'mob' || entity.type === 'player');
         if (target) {
-          bot.attack(target); // Tiến hành chém farm mục tiêu
+          bot.attack(target); 
         }
       }
-    }, 1000); // Tần suất quét chém: 1 giây / 1 lần
+    }, 1000); 
   });
 
-  // 5. CƠ CHẾ TỰ ĐỘNG VÀO LẠI GAME KHI SERVER SẬP HOẶC BẢO TRÌ
   bot.on('end', (reason) => {
     console.log(`[RECONNECT] Mat ket noi: ${reason}. Vao lai sau 30s...`);
     clearInterval(farmInterval);
